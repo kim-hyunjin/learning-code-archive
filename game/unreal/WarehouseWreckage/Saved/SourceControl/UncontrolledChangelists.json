@@ -1,0 +1,18 @@
+{
+	"version": 1,
+	"changelists": [
+		{
+			"guid": "00000000000000000000000000000000",
+			"description": "Default Uncontrolled Changelist",
+			"files": [
+				"/Users/hjkim/Desktop/work/hello-unreal/WarehouseWreckage/Content/StarterContent/Blueprints/Blueprint_Effect_Smoke.uasset",
+				"/Users/hjkim/Desktop/work/hello-unreal/WarehouseWreckage/Content/StarterContent/Maps/Minimal_Default.umap",
+				"/Users/hjkim/Desktop/work/hello-unreal/WarehouseWreckage/Content/StarterContent/Maps/BP_Projectile.uasset",
+				"/Users/hjkim/Desktop/work/hello-unreal/WarehouseWreckage/Content/MainMap.umap",
+				"/Users/hjkim/Desktop/work/hello-unreal/WarehouseWreckage/Content/IndustryPropsPack6/Meshes/SM_Barrel01.uasset",
+				"/Users/hjkim/Desktop/work/hello-unreal/WarehouseWreckage/Content/IndustryPropsPack6/Meshes/BP_Barrel.uasset",
+				"/Users/hjkim/Desktop/work/hello-unreal/WarehouseWreckage/Content/BP_Barrel.uasset"
+			]
+		}
+	]
+}
