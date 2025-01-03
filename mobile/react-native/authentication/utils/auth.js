@@ -1,12 +1,12 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_KEY = 'AIzaSyBip2xP-St2yob77XB-DbVsObbvwtGH6oE';
+const API_KEY = "";
 export async function createUser(email, password) {
-  return authenticate('signUp', email, password);
+  return authenticate("signUp", email, password);
 }
 
 export async function login(email, password) {
-  return authenticate('signInWithPassword', email, password);
+  return authenticate("signInWithPassword", email, password);
 }
 
 async function authenticate(mode, email, password) {

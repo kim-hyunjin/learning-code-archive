@@ -9,7 +9,7 @@ import {
 import { getStorage } from 'firebase/storage'
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyBzDPAqlC7GGs-u8Hgt5trnTzCtt5iaDbs',
+  apiKey: '',
   authDomain: 'music-344ed.firebaseapp.com',
   projectId: 'music-344ed',
   storageBucket: 'music-344ed.appspot.com',

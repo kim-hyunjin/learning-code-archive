@@ -11,7 +11,7 @@
     <string name="no_happy_places_found_yet">No Happy Places Found Yet</string>
     <string name="happy_place_thumbnail">Happy Place Thumbnail</string>
 
-    <string name="google_maps_key">AIzaSyAGe-d2GMJiMw1IiXlXXqD0O7vKLz96Jx8</string>
+    <string name="google_maps_key"></string>
     <string name="view_on_map">VIEW ON MAP</string>
     <string name="select_current_location">SELECT CURRENT LOCATION</string>
 </resources>
