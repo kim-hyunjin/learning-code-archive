@@ -1,19 +1,14 @@
 //
-//  ViewController.swift
+//  QuizBrain.swift
 //  Quizzler-iOS13
 //
-//  Created by Angela Yu on 12/07/2019.
-//  Copyright © 2019 The App Brewery. All rights reserved.
+//  Created by KinHyunJin on 1/7/25.
+//  Copyright © 2025 The App Brewery. All rights reserved.
 //
 
-import UIKit
-
-class ViewController: UIViewController {
-    
-    @IBOutlet weak var falseBtn: UIButton!
-    @IBOutlet weak var trueBtn: UIButton!
-    @IBOutlet weak var progressBar: UIProgressView!
-    @IBOutlet weak var questionText: UILabel!
+struct QuizBrain {
+    var score = 0
+    var currentQuestionIndex: Int = 0
     
     let questions = [Question(q: "A slug's blood is green.", a: "True"),
                      Question(q: "Approximately one quarter of human bones are in the feet.", a: "True"),
@@ -28,41 +23,27 @@ class ViewController: UIViewController {
                      Question(q: "No piece of square dry paper can be folded in half more than 7 times.", a: "False"),
                      Question(q: "Chocolate affects a dog's heart and nervous system; a few ounces are enough to kill a small dog.", a: "True")]
     
-    var currentQuestionIndex: Int = 0
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        // Do any additional setup after loading the view.
-        updateQuestion()
-        trueBtn.layer.cornerRadius = 20
-        falseBtn.layer.cornerRadius = 20
-    }
-
-    @IBAction func btnClicked(_ sender: UIButton) {
-        let userAnswer = sender.currentTitle!
+    mutating func isCorrectAnswer(answer: String) -> Bool {
         let question = questions[currentQuestionIndex]
-        
-        if question.answer == userAnswer {
-            sender.backgroundColor = .green
-        } else {
-            sender.backgroundColor = .red
+        let isCorrect = question.answer == answer
+        if isCorrect {
+            score += 1
         }
-        
-        Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { Timer in
-            sender.backgroundColor = nil
-            self.currentQuestionIndex += 1
-            if self.currentQuestionIndex > self.questions.count - 1 {
-                self.currentQuestionIndex = 0
-            }
-            self.updateQuestion()
+        return isCorrect
+    }
+    
+    mutating func goToNextQuestion() -> Void {
+        currentQuestionIndex += 1
+        if currentQuestionIndex > questions.count - 1 {
+            currentQuestionIndex = 0
         }
     }
     
-    func updateQuestion() {
-        let question = questions[currentQuestionIndex]
-        
-        self.questionText.text = question.text
-        self.progressBar.progress = Float(currentQuestionIndex + 1)/Float(questions.count)
+    func getQuestion() -> Question {
+        return questions[currentQuestionIndex]
+    }
+    
+    func getProgress() -> Float {
+        Float(currentQuestionIndex + 1)/Float(questions.count)
     }
 }
-
