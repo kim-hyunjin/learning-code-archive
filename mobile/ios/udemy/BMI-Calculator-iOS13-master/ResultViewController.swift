@@ -11,15 +11,20 @@ import UIKit
 class ResultViewController: UIViewController {
     
     var bmiValue: String?
+    var bgColor: UIColor?
+    var advice: String?
 
     @IBOutlet weak var adviceLabel: UILabel!
     @IBOutlet weak var bmiLabel: UILabel!
+    @IBOutlet weak var resultBg: UIImageView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
         bmiLabel.text = bmiValue
+        adviceLabel.text = advice
+        resultBg.backgroundColor = bgColor
     }
     
 
