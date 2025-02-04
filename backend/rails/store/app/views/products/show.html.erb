@@ -2,4 +2,7 @@
 
 <%= link_to "Back", products_path %>
 
-<%= link_to "Edit", edit_product_path(@product) %>
+<% if authenticated? %>
+  <%= link_to "Edit", edit_product_path(@product) %>
+  <%= button_to "Destroy", @product, method: :delete, data: { turbo_confirm: "Are you sure?" } %>
+<% end %>
