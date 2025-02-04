@@ -11,4 +11,20 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
+  root "products#index"
+
+  resources :products
+  # resources :products는 아래의 7개의 라우트를 한번에 생성해준다.
+  # get "/products", to: "products#index"
+
+  # get "/products/new", to: "products#new"
+  # post "/products", to: "products#create"
+
+  # get "/products/:id", to: "products#show"
+
+  # get "/products/:id/edit", to: "products#edit"
+  # patch "/products/:id", to: "products#update"
+  # put "/products/:id", to: "products#update"
+
+  # delete "/products/:id", to: "products#destroy"
 end
