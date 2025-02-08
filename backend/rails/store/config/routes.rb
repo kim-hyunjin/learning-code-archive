@@ -15,7 +15,10 @@ Rails.application.routes.draw do
   # root "posts#index"
   root "products#index"
 
-  resources :products
+  resources :products do
+    resources :subscribers, only: [ :create ]
+  end
+
   # resources :products는 아래의 7개의 라우트를 한번에 생성해준다.
   # get "/products", to: "products#index"
 
