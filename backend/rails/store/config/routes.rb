@@ -17,8 +17,8 @@ Rails.application.routes.draw do
 
   resources :products do
     resources :subscribers, only: [ :create ]
-    resource :unsubscribe, only: [ :show ]
   end
+  resource :unsubscribe, only: [ :show ]
 
   # resources :products는 아래의 7개의 라우트를 한번에 생성해준다.
   # get "/products", to: "products#index"
