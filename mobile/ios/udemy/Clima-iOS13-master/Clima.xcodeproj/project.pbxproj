@@ -17,6 +17,7 @@
 		CAFEEE292DAA18B1000BF30B /* WeatherManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEEE282DAA18B1000BF30B /* WeatherManager.swift */; };
 		CAFEEE2B2DAA25DE000BF30B /* WeatherData.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEEE2A2DAA25DE000BF30B /* WeatherData.swift */; };
 		CAFEEE2D2DAA2955000BF30B /* WeatherModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEEE2C2DAA2955000BF30B /* WeatherModel.swift */; };
+		CAFEEE2F2DAA2B72000BF30B /* WeatherManageDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEEE2E2DAA2B72000BF30B /* WeatherManageDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		CAFEEE282DAA18B1000BF30B /* WeatherManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WeatherManager.swift; path = Clima/WeatherManager.swift; sourceTree = SOURCE_ROOT; };
 		CAFEEE2A2DAA25DE000BF30B /* WeatherData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WeatherData.swift; path = Clima/WeatherData.swift; sourceTree = SOURCE_ROOT; };
 		CAFEEE2C2DAA2955000BF30B /* WeatherModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WeatherModel.swift; path = Clima/WeatherModel.swift; sourceTree = SOURCE_ROOT; };
+		CAFEEE2E2DAA2B72000BF30B /* WeatherManageDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WeatherManageDelegate.swift; path = Clima/WeatherManageDelegate.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +101,7 @@
 				CAFEEE282DAA18B1000BF30B /* WeatherManager.swift */,
 				CAFEEE2A2DAA25DE000BF30B /* WeatherData.swift */,
 				CAFEEE2C2DAA2955000BF30B /* WeatherModel.swift */,
+				CAFEEE2E2DAA2B72000BF30B /* WeatherManageDelegate.swift */,
 			);
 			path = Model;
 			sourceTree = "<group>";
@@ -176,6 +179,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ADAA27B5231BBFAF00365194 /* WeatherViewController.swift in Sources */,
+				CAFEEE2F2DAA2B72000BF30B /* WeatherManageDelegate.swift in Sources */,
 				CAFEEE2B2DAA25DE000BF30B /* WeatherData.swift in Sources */,
 				ADAA27B1231BBFAF00365194 /* AppDelegate.swift in Sources */,
 				CAFEEE292DAA18B1000BF30B /* WeatherManager.swift in Sources */,
