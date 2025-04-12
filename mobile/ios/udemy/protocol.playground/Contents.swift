@@ -59,6 +59,12 @@ protocol CanFly {
     func fly()
 }
 
+extension CanFly {
+    func fly() {
+        print("The object is flying.")
+    }
+}
+
 class Bird: CanFly {
     var isFemale = true
     
