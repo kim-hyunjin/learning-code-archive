@@ -38,4 +38,35 @@ public class ArrayFlattening {
 
         return (T) flattenedArray;
     }
+
+    public <T> T concat2(Class<?> type, Object... arguments) {
+
+        if (arguments.length == 0) {
+            return null;
+        }
+
+        int totalLength = 0;
+        for (Object arg : arguments) {
+            if (arg.getClass().isArray()) {
+                totalLength += Array.getLength(arg);
+            } else {
+                totalLength++;
+            }
+        }
+
+        Object newArray = Array.newInstance(type, totalLength);
+        int i = 0;
+        for (Object arg : arguments) {
+            if (arg.getClass().isArray()) {
+                int length = Array.getLength(arg);
+                for (int j = 0; j < length; j++) {
+                    Array.set(newArray, i++, Array.get(arg, j));
+                }
+            } else {
+                Array.set(newArray, i++, arg);
+            }
+        }
+
+        return (T) newArray;
+    }
 }
