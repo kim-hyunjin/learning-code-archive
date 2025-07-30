@@ -23,8 +23,8 @@ const configuration = {
 // Global variables
 let socket;
 let localStream;
-let peerConnection;
-let dataChannel;
+let peerConnections = {}; // Map of userId -> RTCPeerConnection
+let dataChannels = {}; // Map of userId -> RTCDataChannel
 let currentRoom = null;
 let isAudioMuted = false;
 let isVideoOff = false;
@@ -144,43 +144,48 @@ function handleRoomCreated(roomId) {
 }
 
 // Handle room joined event
-function handleRoomJoined(roomId) {
+function handleRoomJoined(roomId, existingParticipants) {
   currentRoom = roomId;
-  updateStatus(`Joined room: ${roomId}`);
+  updateStatus(`Joined room: ${roomId} with ${existingParticipants.length} existing participants`);
   
   // Update UI
   createBtn.disabled = true;
   joinBtn.disabled = true;
   leaveBtn.disabled = false;
   
-  // Create peer connection and send offer
-  createPeerConnection();
-  createDataChannel();
-  createAndSendOffer();
+  // Create peer connections with all existing participants
+  existingParticipants.forEach(peerId => {
+    createPeerConnection(peerId);
+    createDataChannel(peerId);
+    createAndSendOffer(peerId);
+  });
 }
 
 // Handle user joined event
 function handleUserJoined(userId) {
-  updateStatus('Another user joined the room');
+  updateStatus(`User ${userId.substring(0, 4)}... joined the room`);
   
-  // Create peer connection if not already created
-  if (!peerConnection) {
-    createPeerConnection();
-  }
+  // We don't need to create a connection here
+  // The new user will create connections with all existing users
+  // and send offers to them
 }
 
 // Handle user left event
 function handleUserLeft(userId) {
-  updateStatus('The other user left the room');
+  updateStatus(`User ${userId.substring(0, 4)}... left the room`);
   
-  // Close peer connection
-  closePeerConnection();
+  // Close the specific peer connection
+  closePeerConnection(userId);
   
-  // Clear remote video
-  remoteVideo.srcObject = null;
+  // Check if we still have any open data channels
+  const anyChannelOpen = Object.values(dataChannels).some(
+    channel => channel.readyState === 'open'
+  );
   
-  // Disable send button
-  sendBtn.disabled = true;
+  // Disable send button if no open channels
+  if (!anyChannelOpen) {
+    sendBtn.disabled = true;
+  }
 }
 
 // Leave the current room
@@ -188,30 +193,29 @@ function handleLeaveRoom() {
   if (currentRoom) {
     socket.emit('leave-room', currentRoom);
     
-    // Close peer connection
-    closePeerConnection();
-    
-    // Clear remote video
-    remoteVideo.srcObject = null;
+    // Close all peer connections
+    closePeerConnection(); // No parameter means close all
     
     // Update UI
     createBtn.disabled = false;
     joinBtn.disabled = false;
     leaveBtn.disabled = true;
     sendBtn.disabled = true;
+    messageInput.disabled = true;
     
     currentRoom = null;
     updateStatus('Left the room');
   }
 }
 
-// Create a WebRTC peer connection
-function createPeerConnection() {
-  // Close any existing connection
-  closePeerConnection();
+// Create a WebRTC peer connection for a specific peer
+function createPeerConnection(peerId) {
+  // Close existing connection for this peer if it exists
+  closePeerConnection(peerId);
   
   // Create a new connection
-  peerConnection = new RTCPeerConnection(configuration);
+  const peerConnection = new RTCPeerConnection(configuration);
+  peerConnections[peerId] = peerConnection;
   
   // Add local stream tracks to the connection
   localStream.getTracks().forEach(track => {
@@ -222,7 +226,7 @@ function createPeerConnection() {
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
       socket.emit('ice-candidate', {
-        target: getOtherParticipantId(),
+        target: peerId,
         candidate: event.candidate
       });
     }
@@ -230,51 +234,86 @@ function createPeerConnection() {
   
   peerConnection.ontrack = (event) => {
     if (event.streams && event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
+      // Create or get video element for this peer
+      let videoElement = document.getElementById(`remote-video-${peerId}`);
+      
+      if (!videoElement) {
+        const videoContainer = document.createElement('div');
+        videoContainer.className = 'remote-video-container';
+        videoContainer.id = `remote-video-container-${peerId}`;
+        
+        const videoLabel = document.createElement('h3');
+        videoLabel.textContent = `Peer ${peerId.substring(0, 4)}...`;
+        
+        videoElement = document.createElement('video');
+        videoElement.id = `remote-video-${peerId}`;
+        videoElement.autoplay = true;
+        videoElement.playsinline = true;
+        
+        videoContainer.appendChild(videoLabel);
+        videoContainer.appendChild(videoElement);
+        
+        document.getElementById('remoteVideosContainer').appendChild(videoContainer);
+      }
+      
+      videoElement.srcObject = event.streams[0];
     }
   };
   
   peerConnection.ondatachannel = (event) => {
-    dataChannel = event.channel;
-    setupDataChannel();
+    dataChannels[peerId] = event.channel;
+    setupDataChannel(peerId);
   };
   
-  console.log('Peer connection created');
+  console.log(`Peer connection created for ${peerId}`);
+  return peerConnection;
 }
 
-// Create a data channel for chat
-function createDataChannel() {
-  if (peerConnection) {
-    dataChannel = peerConnection.createDataChannel('chat');
-    setupDataChannel();
-    console.log('Data channel created');
+// Create a data channel for chat with a specific peer
+function createDataChannel(peerId) {
+  if (peerConnections[peerId]) {
+    const dataChannel = peerConnections[peerId].createDataChannel('chat');
+    dataChannels[peerId] = dataChannel;
+    setupDataChannel(peerId);
+    console.log(`Data channel created for peer ${peerId}`);
+    return dataChannel;
   }
+  return null;
 }
 
-// Set up data channel event handlers
-function setupDataChannel() {
+// Set up data channel event handlers for a specific peer
+function setupDataChannel(peerId) {
+  const dataChannel = dataChannels[peerId];
   if (!dataChannel) return;
   
   dataChannel.onopen = () => {
-    console.log('Data channel opened');
+    console.log(`Data channel opened for peer ${peerId}`);
     sendBtn.disabled = false;
     messageInput.disabled = false;
   };
   
   dataChannel.onclose = () => {
-    console.log('Data channel closed');
-    sendBtn.disabled = true;
-    messageInput.disabled = true;
+    console.log(`Data channel closed for peer ${peerId}`);
+    // Only disable send button if all data channels are closed
+    const anyChannelOpen = Object.values(dataChannels).some(
+      channel => channel.readyState === 'open'
+    );
+    if (!anyChannelOpen) {
+      sendBtn.disabled = true;
+      messageInput.disabled = true;
+    }
   };
   
   dataChannel.onmessage = (event) => {
     const message = event.data;
-    addMessageToChat('Peer', message);
+    // Use the first 4 characters of the peer ID as the sender name
+    addMessageToChat(`Peer ${peerId.substring(0, 4)}...`, message);
   };
 }
 
-// Create and send an offer
-async function createAndSendOffer() {
+// Create and send an offer to a specific peer
+async function createAndSendOffer(peerId) {
+  const peerConnection = peerConnections[peerId];
   if (!peerConnection) return;
   
   try {
@@ -282,21 +321,26 @@ async function createAndSendOffer() {
     await peerConnection.setLocalDescription(offer);
     
     socket.emit('offer', {
-      target: getOtherParticipantId(),
+      target: peerId,
       offer: offer
     });
     
-    console.log('Offer sent');
+    console.log(`Offer sent to ${peerId}`);
   } catch (error) {
-    console.error('Error creating offer:', error);
+    console.error(`Error creating offer for ${peerId}:`, error);
   }
 }
 
 // Handle an incoming offer
 async function handleOffer(data) {
-  if (!peerConnection) {
-    createPeerConnection();
+  const sourceId = data.source;
+  
+  // Create peer connection if it doesn't exist
+  if (!peerConnections[sourceId]) {
+    createPeerConnection(sourceId);
   }
+  
+  const peerConnection = peerConnections[sourceId];
   
   try {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
@@ -305,46 +349,92 @@ async function handleOffer(data) {
     await peerConnection.setLocalDescription(answer);
     
     socket.emit('answer', {
-      target: data.source,
+      target: sourceId,
       answer: answer
     });
     
-    console.log('Answer sent');
+    console.log(`Answer sent to ${sourceId}`);
   } catch (error) {
-    console.error('Error handling offer:', error);
+    console.error(`Error handling offer from ${sourceId}:`, error);
   }
 }
 
 // Handle an incoming answer
 async function handleAnswer(data) {
+  const sourceId = data.source;
+  const peerConnection = peerConnections[sourceId];
+  
+  if (!peerConnection) {
+    console.error(`Received answer from ${sourceId} but no peer connection exists`);
+    return;
+  }
+  
   try {
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-    console.log('Answer received and set');
+    console.log(`Answer from ${sourceId} received and set`);
   } catch (error) {
-    console.error('Error handling answer:', error);
+    console.error(`Error handling answer from ${sourceId}:`, error);
   }
 }
 
 // Handle an incoming ICE candidate
 async function handleIceCandidate(data) {
+  const sourceId = data.source;
+  const peerConnection = peerConnections[sourceId];
+  
+  if (!peerConnection) {
+    console.error(`Received ICE candidate from ${sourceId} but no peer connection exists`);
+    return;
+  }
+  
   try {
     await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-    console.log('ICE candidate added');
+    console.log(`ICE candidate from ${sourceId} added`);
   } catch (error) {
-    console.error('Error handling ICE candidate:', error);
+    console.error(`Error handling ICE candidate from ${sourceId}:`, error);
   }
 }
 
-// Close the peer connection
-function closePeerConnection() {
-  if (dataChannel) {
-    dataChannel.close();
-    dataChannel = null;
-  }
-  
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
+// Close a specific peer connection or all peer connections
+function closePeerConnection(peerId = null) {
+  if (peerId) {
+    // Close specific peer connection
+    if (dataChannels[peerId]) {
+      dataChannels[peerId].close();
+      delete dataChannels[peerId];
+    }
+    
+    if (peerConnections[peerId]) {
+      peerConnections[peerId].close();
+      delete peerConnections[peerId];
+    }
+    
+    // Remove the video element
+    const videoContainer = document.getElementById(`remote-video-container-${peerId}`);
+    if (videoContainer) {
+      videoContainer.remove();
+    }
+    
+    console.log(`Closed peer connection with ${peerId}`);
+  } else {
+    // Close all peer connections
+    Object.keys(dataChannels).forEach(id => {
+      dataChannels[id].close();
+    });
+    
+    Object.keys(peerConnections).forEach(id => {
+      peerConnections[id].close();
+    });
+    
+    // Clear the containers
+    dataChannels = {};
+    peerConnections = {};
+    
+    // Remove all remote videos
+    const remoteVideosContainer = document.getElementById('remoteVideosContainer');
+    remoteVideosContainer.innerHTML = '';
+    
+    console.log('Closed all peer connections');
   }
 }
 
@@ -374,14 +464,27 @@ function toggleVideo() {
   }
 }
 
-// Send a chat message
+// Send a chat message to all connected peers
 function sendMessage() {
   const message = messageInput.value.trim();
   
-  if (message && dataChannel && dataChannel.readyState === 'open') {
-    dataChannel.send(message);
+  if (!message) return;
+  
+  let messageSent = false;
+  
+  // Send to all open data channels
+  Object.entries(dataChannels).forEach(([peerId, channel]) => {
+    if (channel.readyState === 'open') {
+      channel.send(message);
+      messageSent = true;
+    }
+  });
+  
+  if (messageSent) {
     addMessageToChat('You', message);
     messageInput.value = '';
+  } else {
+    updateStatus('No open connections to send message');
   }
 }
 
@@ -401,13 +504,6 @@ function updateStatus(message) {
 // Generate a random room ID
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 10);
-}
-
-// Helper function to get the other participant's ID
-function getOtherParticipantId() {
-  // This is a simplification. In a real app, you would get this from the server.
-  return Array.from(socket.adapter?.rooms?.get(currentRoom) || [])
-    .find(id => id !== socket.id);
 }
 
 // Initialize the application when the page loads

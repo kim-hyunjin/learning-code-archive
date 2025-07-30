@@ -48,20 +48,14 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Check if room is full (for simplicity, limit to 2 participants)
-    if (rooms[roomId].participants.length >= 2) {
-      socket.emit('error', 'Room is full');
-      return;
-    }
-    
     // Join the room
     socket.join(roomId);
     rooms[roomId].participants.push(socket.id);
     
-    // Notify the client
-    socket.emit('room-joined', roomId);
+    // Notify the client about successful join
+    socket.emit('room-joined', roomId, rooms[roomId].participants.filter(id => id !== socket.id));
     
-    // Notify the other participant
+    // Notify all other participants about the new user
     socket.to(roomId).emit('user-joined', socket.id);
   });
 
