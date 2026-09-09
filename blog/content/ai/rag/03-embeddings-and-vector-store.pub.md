@@ -90,8 +90,9 @@ OpenAI 기준으로 두 가지가 주로 쓰입니다.
 | `text-embedding-3-small` | 1536 | **기본 선택.** 저렴하고 충분히 좋습니다. |
 | `text-embedding-3-large` | 3072 | 정확도가 조금 더 높지만 비싸고 저장 용량도 두 배 |
 
-`pdf-app`은 `OpenAIEmbeddings()`를 인자 없이 호출합니다. 이러면 라이브러리 기본 모델을 쓰게 되는데,
-**모델명은 명시하는 편이 안전합니다.** 라이브러리 기본값이 바뀌면 인덱스와 질의의 모델이 어긋날 수 있습니다.
+예제 코드에서 `OpenAIEmbeddings()`를 인자 없이 호출하는 것을 자주 보게 되는데,
+이러면 라이브러리 기본 모델을 쓰게 됩니다. **모델명은 명시하는 편이 안전합니다.**
+라이브러리 기본값이 바뀌면 인덱스와 질의의 모델이 어긋날 수 있습니다.
 
 ```python
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -115,8 +116,7 @@ API 호출이 없어 무료이고 데이터가 밖으로 나가지 않습니다.
 "검색 결과가 무작위처럼 보인다"의 흔한 원인이 이것입니다.
 모델을 바꾸려면 **전체 재인덱싱**이 필요합니다. 차원 수가 다르면 벡터 DB가 아예 거부하기도 합니다.
 
-그래서 임베딩 설정은 한 곳에만 두는 것이 좋습니다.
-`pdf-app`이 `app/chat/embeddings/openai.py`에 모듈 하나로 분리해 둔 이유입니다.
+그래서 임베딩 설정은 한 곳에만 두는 것이 좋습니다. 모듈 하나로 분리해 두세요.
 
 ```python
 # app/chat/embeddings/openai.py
@@ -157,7 +157,7 @@ for i in range(0, len(chunks), BATCH):
 
 1. 학습·프로토타입 → **FAISS**
 2. 이미 Postgres를 쓰는 서비스 → **pgvector**
-3. 인프라를 신경 쓰기 싫고 예산이 있다 → **Pinecone** (`pdf-app`의 선택)
+3. 인프라를 신경 쓰기 싫고 예산이 있다 → **Pinecone**
 
 인터페이스가 대부분 같아서 나중에 갈아타기가 어렵지 않습니다. **FAISS로 시작해도 손해가 아닙니다.**
 
@@ -179,7 +179,7 @@ store.add_documents(new_chunks)
 store.save_local("faiss_index")
 ```
 
-### Pinecone: `pdf-app`의 선택
+### Pinecone: 관리형으로 넘기기
 
 먼저 인덱스를 한 번 만들어 둡니다. **차원 수가 임베딩 모델과 일치해야** 합니다.
 
@@ -188,38 +188,31 @@ from pinecone import Pinecone, ServerlessSpec
 
 pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
 pc.create_index(
-    name="pdf-app",
+    name="rag-docs",
     dimension=1536,           # text-embedding-3-small의 차원
     metric="cosine",
     spec=ServerlessSpec(cloud="aws", region="us-east-1"),
 )
 ```
 
-`pdf-app`의 코드는 이렇습니다(`app/chat/vector_stores/pinecone.py`).
+앱에서는 이미 만들어진 인덱스에 붙기만 하면 됩니다.
 
 ```python
-vector_store = Pinecone.from_existing_index(
-    os.getenv("PINECONE_INDEX_NAME"), embeddings
-)
-
-def build_retriever(chat_args: ChatArgs, k):
-    search_kwargs = {"filter": {"pdf_id": chat_args.pdf_id}, "k": k}
-    return vector_store.as_retriever(search_kwargs=search_kwargs)
-```
-
-최신 패키지 구조에서는 임포트 경로만 달라집니다.
-
-```python
-# 옛 코드 (langchain 0.0.x)
-from langchain.vectorstores import Pinecone
-
-# 지금
 from langchain_pinecone import PineconeVectorStore
 
 vector_store = PineconeVectorStore.from_existing_index(
     os.environ["PINECONE_INDEX_NAME"], embeddings
 )
+
+def build_retriever(pdf_id: str, k: int = 4):
+    return vector_store.as_retriever(
+        search_kwargs={"filter": {"pdf_id": pdf_id}, "k": k}
+    )
 ```
+
+> 예전 자료에는 `from langchain.vectorstores import Pinecone`처럼 임포트하는 코드가 많습니다.
+> 지금은 스토어마다 패키지가 분리되어 `langchain_pinecone`, `langchain_chroma`,
+> `langchain_postgres` 같은 이름을 씁니다. 클래스 이름도 `PineconeVectorStore`로 바뀌었습니다.
 
 `from_existing_index`라는 이름 그대로, **인덱스는 미리 만들어져 있다고 가정**합니다.
 앱이 뜰 때마다 인덱스를 만들지 않는 것은 옳은 설계입니다. 인덱스 생성은 배포 시 한 번 하는 작업입니다.
@@ -248,7 +241,7 @@ vector_store.add_documents(chunks, ids=ids)
 
 ```python
 # Pinecone: pdf_id 메타데이터로 한 문서의 벡터를 모두 삭제
-index = pc.Index("pdf-app")
+index = pc.Index("rag-docs")
 index.delete(filter={"pdf_id": pdf_id})
 ```
 

@@ -26,7 +26,7 @@ const TOPIC_LABELS: Record<string, string> = {
   language: 'Language',
   mobile: 'Mobile',
   security: 'Security',
-  'ai/rag-pdf-chat': 'RAG PDF Chat',
+  'ai/rag': 'RAG',
   'backend/backend-engineering': 'Backend Engineering',
   'backend/backend-engineering/asynchronous-processing': 'Asynchronous Processing',
   'backend/backend-engineering/communications': 'Communications',

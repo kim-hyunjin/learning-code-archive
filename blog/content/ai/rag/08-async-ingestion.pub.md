@@ -75,9 +75,9 @@ sequenceDiagram
 | **브로커** (Redis) | 작업 목록을 담아 두는 곳 |
 | **워커** (Celery) | 큐에서 작업을 꺼내 실제로 처리 |
 
-## 3. 업로드 뷰 읽기
+## 3. 업로드 뷰
 
-`app/web/views/pdf_views.py`:
+업로드 엔드포인트가 할 일은 셋뿐입니다. 파일 저장, DB 레코드 생성, 큐에 위임.
 
 ```python
 @bp.route("/", methods=["POST"])
@@ -99,7 +99,7 @@ def upload_file(file_id, file_path, file_name):
 `.delay(...)`가 이 편의 주인공입니다. 함수를 **호출하지 않고**, "이 함수를 이 인자로 실행하라"는
 메시지를 Redis에 넣고 즉시 반환합니다.
 
-`@handle_file_upload` 데코레이터는 파일을 임시 디렉터리에 저장하고 UUID를 붙여 줍니다(`app/web/hooks.py`).
+`@handle_file_upload`는 파일을 임시 디렉터리에 저장하고 UUID를 붙여 주는 데코레이터입니다.
 
 ```python
 def handle_file_upload(fn):
@@ -118,7 +118,7 @@ def handle_file_upload(fn):
     return wrapped
 ```
 
-두 가지가 잘 되어 있습니다.
+여기서 두 가지가 중요합니다.
 
 - **`tempfile.TemporaryDirectory()`를 `with`로 감싸** 뷰가 끝나면 임시 파일이 반드시 정리됩니다.
 - **파일명을 UUID로 대체**합니다. 사용자가 올린 이름을 그대로 경로에 쓰면
@@ -132,7 +132,7 @@ def handle_file_upload(fn):
 
 ## 4. 워커가 하는 일
 
-`app/web/tasks/embeddings.py` — 태스크 전체가 이게 다입니다.
+태스크 자체는 이게 전부입니다.
 
 ```python
 @shared_task()
@@ -146,7 +146,7 @@ def process_document(pdf_id: int):
 큐에 들어가는 메시지는 JSON으로 직렬화되므로, **작고 단순한 식별자만** 넣고
 필요한 데이터는 워커가 직접 조회하는 것이 원칙입니다.
 
-`download`는 컨텍스트 매니저입니다(`app/web/files.py`).
+`download`는 스토리지에서 파일을 내려받는 컨텍스트 매니저입니다.
 
 ```python
 class _Download:
@@ -164,7 +164,7 @@ class _Download:
 ### Flask와 Celery 연결하기
 
 워커는 Flask 요청 밖에서 도는 별도 프로세스라, 그냥은 DB 세션이나 설정에 접근할 수 없습니다.
-`app/celery/__init__.py`가 다리를 놓습니다.
+다리를 놓는 코드가 필요합니다.
 
 ```python
 def celery_init_app(app: Flask) -> Celery:
@@ -187,17 +187,17 @@ def celery_init_app(app: Flask) -> Celery:
 ### 실행
 
 ```bash
-redis-server                    # 브로커
-inv dev                         # 웹 서버 (flask run)
-inv devworker                   # Celery 워커
+redis-server                            # 브로커
+flask --app app run --debug             # 웹 서버
+celery -A app.celery worker --loglevel=info   # 워커
 ```
 
 **셋 다 떠 있어야** 업로드가 처리됩니다.
 "업로드는 성공했는데 질문하면 아무것도 못 찾는다"의 1순위 원인이 **워커가 안 떠 있는 것**입니다.
 
-## 5. `pdf-app`에 빠져 있는 것: 진행 상태
+## 5. 빠뜨리기 쉬운 것: 진행 상태
 
-현재 구조에는 큰 구멍이 하나 있습니다. **사용자가 인제스트 상태를 알 수 없습니다.**
+지금까지의 구조에는 큰 구멍이 하나 있습니다. **사용자가 인제스트 상태를 알 수 없습니다.**
 
 - 업로드 직후 질문하면 벡터가 아직 없어 "못 찾겠다"는 답이 나옵니다. 사용자는 앱이 고장 났다고 생각합니다.
 - 임베딩이 실패해도 아무도 모릅니다. 태스크가 조용히 죽고, 로그를 보는 사람만 압니다.

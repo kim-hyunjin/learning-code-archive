@@ -11,7 +11,7 @@ tags:
   - "SSE"
   - "Flask"
   - "LangChain"
-summary: "답변을 토큰 단위로 흘려보내는 방법을 다룹니다. LCEL의 stream부터 pdf-app의 큐+스레드 구현, 콜백이 모든 LLM에 전파되며 생기는 스트림 조기 종료 버그까지 해부합니다."
+summary: "답변을 토큰 단위로 흘려보내는 방법을 다룹니다. LCEL의 stream부터 직접 만드는 큐+스레드 구현, 콜백이 모든 LLM에 전파되며 생기는 스트림 조기 종료 버그까지 해부합니다."
 ---
 
 지금까지 만든 RAG는 답이 다 만들어질 때까지 **아무것도 보여 주지 않습니다.**
@@ -56,13 +56,16 @@ async for event in rag_chain.astream_events({"input": q}, version="v2"):
 체인 안에서 벌어지는 모든 일(검색 시작/끝, 각 LLM의 토큰)이 이벤트로 나옵니다.
 어떤 LLM의 토큰인지 구분하는 것도 여기서는 `event["name"]`이나 태그로 처리할 수 있습니다.
 
-## 2. `pdf-app`은 왜 직접 만들었나
+## 2. 직접 만들어야 할 때: 큐 + 스레드
 
-`pdf-app`이 쓰는 `langchain==0.0.352`에는 `stream()`이 없었습니다.
-체인 실행이 **블로킹 함수 호출**이라, 결과가 다 나올 때까지 반환되지 않았죠.
-그래서 직접 만들었습니다. 지금은 필요 없는 코드지만, **콜백과 스트리밍의 원리를 이해하는 데는 훌륭한 교재**입니다.
+대부분은 위의 `stream()`으로 끝납니다. 그래도 원리를 알아 둘 값어치가 있습니다.
 
-`app/chat/chains/streamable.py`:
+- 후처리(문장 단위 버퍼링, 마스킹, 인용 각주 삽입)를 토큰 흐름 중간에 끼워야 할 때
+- LangChain 밖의 **블로킹 호출**을 스트리밍 응답으로 감싸야 할 때
+- 오래된 예제나 사내 코드가 이 구조로 되어 있어 읽어야 할 때
+
+원리는 단순합니다. 블로킹 호출을 별도 스레드에 맡기고, 콜백이 토큰을 큐에 넣고,
+제너레이터가 큐에서 꺼내 흘려보냅니다.
 
 ```python
 class StreamableChain:
@@ -115,7 +118,7 @@ sequenceDiagram
 
 ## 3. 콜백 핸들러 — 그리고 진짜 함정
 
-토큰을 큐에 넣는 쪽이 `app/chat/callbacks/stream.py`입니다.
+토큰을 큐에 넣는 쪽은 콜백 핸들러입니다.
 
 ```python
 class StreamingHandler(BaseCallbackHandler):
@@ -153,7 +156,7 @@ class StreamingHandler(BaseCallbackHandler):
 3. 압축이 끝나면서 `on_llm_end`가 호출된다 → 큐에 `None`이 들어간다
 4. 제너레이터가 루프를 종료한다 → **진짜 답변은 시작도 하기 전에 스트림이 끊긴다**
 
-`pdf-app`은 이 문제를 **두 겹**으로 막습니다.
+막는 방법은 **두 겹**입니다.
 
 - **1겹**: 압축용 LLM을 `ChatOpenAI(streaming=False)`로 만든다 → 애초에 토큰이 안 나온다
 - **2겹**: 핸들러가 `on_chat_model_start`에서 **스트리밍 모델의 `run_id`만 기록**해 두고,
@@ -228,29 +231,27 @@ class StreamableChain:
 
 ## 4. 서버: 스트리밍 HTTP 응답
 
-Flask에서 제너레이터를 그대로 응답으로 흘려보냅니다(`app/web/views/conversation_views.py`).
+Flask에서는 제너레이터를 그대로 응답으로 흘려보내면 됩니다.
 
 ```python
 @bp.route("/<string:conversation_id>/messages", methods=["POST"])
 @login_required
 @load_model(Conversation)
 def create_message(conversation):
-    input = request.json.get("input")
+    user_input = request.json.get("input")
     streaming = request.args.get("stream", False)
 
-    chat_args = ChatArgs(
+    chat = build_chat(
         conversation_id=conversation.id,
         pdf_id=conversation.pdf.id,
         streaming=streaming,
-        metadata={...},
     )
-    chat = build_chat(chat_args)
 
     if streaming:
         return Response(
-            stream_with_context(chat.stream(input)), mimetype="text/event-stream"
+            stream_with_context(chat.stream(user_input)), mimetype="text/event-stream"
         )
-    return jsonify({"role": "assistant", "content": chat.run(input)})
+    return jsonify({"role": "assistant", "content": chat.invoke(user_input)})
 ```
 
 `stream_with_context`는 응답을 흘려보내는 **동안에도 요청 컨텍스트를 유지**해 줍니다.
@@ -259,7 +260,7 @@ def create_message(conversation):
 
 > 엄밀히 말하면 이 응답은 **진짜 SSE 형식은 아닙니다.**
 > SSE 규격은 `data: <내용>\n\n` 형태의 프레임을 요구하고, 브라우저의 `EventSource`가 그걸 파싱합니다.
-> `pdf-app`은 `text/event-stream` 헤더만 쓰고 실제로는 토큰 문자열을 그대로 흘려보냅니다.
+> 위 코드는 `text/event-stream` 헤더만 쓰고 실제로는 토큰 문자열을 그대로 흘려보냅니다.
 > 클라이언트가 `fetch` + `ReadableStream`으로 **바이트를 직접 읽기** 때문에 동작하는 구조입니다.
 > 규격에 맞추려면 이렇게 감싸면 됩니다.
 
@@ -294,12 +295,12 @@ Response(..., mimetype="text/event-stream",
 또 하나. 스트리밍 응답은 **첫 바이트를 보내는 순간 상태 코드가 확정**됩니다.
 그 뒤에 에러가 나면 500을 보낼 수 없고, 이미 보낸 텍스트 뒤에 에러 메시지가 붙습니다.
 그래서 **인증·권한·유효성 검사는 스트리밍을 시작하기 전에** 모두 끝내야 합니다.
-`pdf-app`이 `@login_required`, `@load_model`을 뷰 데코레이터로 먼저 처리하는 것이 그런 구조입니다.
+위 코드가 `@login_required`, `@load_model`을 뷰 데코레이터로 먼저 처리하는 것이 그런 구조입니다.
 
 ## 5. 클라이언트: 토큰 받아 붙이기
 
 `EventSource`는 GET만 지원해서, POST로 질문을 보내야 하는 채팅에는 쓸 수 없습니다.
-그래서 `fetch` + `ReadableStream`을 씁니다(`client/src/store/chat/stream.ts`).
+그래서 `fetch` + `ReadableStream`을 씁니다.
 
 ```ts
 const response = await fetch(`/api/conversations/${id}/messages?stream=true`, {
@@ -359,7 +360,7 @@ const text = decoder.decode(value, { stream: true });
 ## 실습
 
 1. `chain.stream()`으로 답변을 흘려보내고, 첫 토큰까지 걸린 시간과 전체 시간을 각각 측정해 보세요.
-2. 압축용 LLM에 `streaming=True`를 주고 `pdf-app` 방식의 핸들러에서 `run_id` 검사를 빼 보세요. 어떤 일이 벌어지나요?
+2. 압축용 LLM에 `streaming=True`를 주고 위 핸들러에서 `run_id` 검사를 빼 보세요. 어떤 일이 벌어지나요?
 3. 스트리밍 도중 강제로 예외를 던져 보고, 클라이언트가 어떻게 반응하는지 확인해 보세요.
 
 다음 편에서는 반대쪽 끝, **PDF 업로드와 비동기 인제스트**를 다룹니다.

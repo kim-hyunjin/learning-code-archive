@@ -38,8 +38,8 @@ LangChain에는 PDF 로더가 여러 개 있습니다. 결과물이 꽤 다릅�
 | `PDFPlumberLoader` | 표 추출에 강함 | 표가 많은 보고서 |
 | `UnstructuredPDFLoader` | 제목·표·리스트 등 **구조를 인식** | 구조를 살리고 싶을 때 |
 
-`pdf-app`은 가장 단순한 `PyPDFLoader`를 씁니다. 처음에는 이걸로 시작하고,
-**추출된 텍스트를 눈으로 확인한 뒤** 불만이 있을 때 바꾸는 순서를 권합니다.
+가장 단순한 `PyPDFLoader`로 시작하고, **추출된 텍스트를 눈으로 확인한 뒤**
+불만이 있을 때 바꾸는 순서를 권합니다. 처음부터 무거운 로더를 고를 이유가 없습니다.
 
 ```python
 from langchain_community.document_loaders import PyPDFLoader
@@ -110,8 +110,8 @@ for page in pages:
 | **500~1000자** | **일반적인 출발점** | 논문, 매뉴얼, 블로그 |
 | 1500~2500자 | 문맥 풍부, 노이즈 증가 | 법률·계약서, 서술형 보고서 |
 
-`pdf-app`은 500자를 쓰고, 1편의 스크립트는 1000자를 썼습니다.
-**500자는 다소 작은 편**입니다. 한국어 기술 문서라면 800~1200자에서 시작해 보길 권합니다.
+1편의 스크립트는 1000자를 썼습니다. 오래된 예제 코드에서 흔히 보이는 500자는
+**다소 작은 편**입니다. 한국어 기술 문서라면 800~1200자에서 시작해 보길 권합니다.
 
 ### chunk_overlap이 하는 일
 
@@ -196,13 +196,14 @@ sections = header_splitter.split_text(markdown_text)
 
 섹션 제목이 메타데이터로 남으면 답변에 "3.2절 참고" 같은 출처를 붙일 수 있습니다.
 
-## 3. `pdf-app`의 인제스트 코드 읽기
+## 3. 인제스트 함수 한 덩어리로 보기
 
-`app/chat/create_embeddings.py`가 이 두 단계를 그대로 담고 있습니다.
+지금까지의 두 단계를 서비스 코드로 옮기면 대개 이런 함수 하나가 됩니다.
+튜토리얼에서 자주 보는 형태이기도 합니다.
 
 ```python
 def create_embeddings_for_pdf(pdf_id: str, pdf_path: str):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
 
     loader = PyPDFLoader(pdf_path)
     docs = loader.load_and_split(text_splitter)   # ① Load + ② Split
@@ -216,6 +217,8 @@ def create_embeddings_for_pdf(pdf_id: str, pdf_path: str):
 
     vector_store.add_documents(docs)              # ③ Embed + ④ Store
 ```
+
+짧지만 짚고 넘어갈 곳이 여럿입니다. 아래에서 하나씩 봅니다.
 
 ### `load_and_split` vs `load` + `split_documents`
 
@@ -237,13 +240,13 @@ chunks = text_splitter.split_documents(docs)
 |----|--------|
 | `pdf_id` | **검색 범위를 이 문서로 한정**하는 필터 키. 없으면 A 문서를 물었는데 B 문서로 답하는 사고가 납니다. |
 | `page` | 답변에 "몇 페이지"를 붙이기 위한 출처 정보. |
-| `text` | 청크 원문. LangChain의 Pinecone 연동이 기본적으로 `text` 키에서 본문을 복원합니다. |
+| `text` | 청크 원문. Pinecone 연동처럼 원문을 자체 보관하지 않는 스토어에서 본문을 복원하는 데 씁니다. |
 
 `text` 키가 낯설 수 있는데, 이유가 있습니다. Pinecone은 벡터와 메타데이터만 저장하고
 원문 텍스트를 따로 보관하지 않습니다. 그래서 검색 후 `Document.page_content`를 되살리려면
 원문을 메타데이터에 함께 넣어 둬야 합니다. FAISS 같은 로컬 스토어는 원문을 자체 보관하므로 이 작업이 필요 없습니다.
 
-다만 위 코드에는 아쉬운 점이 하나 있습니다. `doc.metadata`를 **통째로 교체**하는 바람에
+위 코드에는 아쉬운 점이 하나 있습니다. `doc.metadata`를 **통째로 교체**하는 바람에
 `PyPDFLoader`가 넣어 준 `source`(파일명) 같은 정보가 사라집니다. 이렇게 하면 더 안전합니다.
 
 ```python
