@@ -6,6 +6,7 @@ import sitemap from '@astrojs/sitemap';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeKatex from 'rehype-katex';
 import rehypeSlug from 'rehype-slug';
+import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { BASE_PATH, SITE_ORIGIN } from './scripts/config.ts';
 import codeLanguageLabelTransformer from './src/lib/code-language-label.ts';
@@ -28,8 +29,11 @@ export default defineConfig({
   ],
   markdown: {
     processor: unified({
-      gfm: true,
-      remarkPlugins: [remarkCjkStrong, remarkMermaid, remarkMath],
+      // Disabled here (instead of `gfm: true`) so we can turn off single-tilde
+      // strikethrough below: range notation like `3~5` was otherwise parsed as
+      // `~text~` strikethrough whenever the document had another lone `~`.
+      gfm: false,
+      remarkPlugins: [[remarkGfm, { singleTilde: false }], remarkCjkStrong, remarkMermaid, remarkMath],
       rehypePlugins: [
         rehypeSlug,
         // Renders $...$ / $$...$$ at build time; only KaTeX CSS is needed in the
