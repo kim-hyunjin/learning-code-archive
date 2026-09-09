@@ -64,11 +64,8 @@ flowchart TB
 
 ## 2. 코드로 만들기
 
-LangChain에서는 압축과 검색을 `create_history_aware_retriever`가 담당합니다.
-
-> 오래된 자료에는 이 흐름이 `ConversationalRetrievalChain` 하나로 묶여 있습니다.
-> 지금은 **레거시**로 분류되어 있으니, 새로 만든다면 아래 조합을 쓰세요.
-> 개념(압축 → 검색 → 생성)은 그대로입니다.
+LangChain에서는 압축과 검색을 `create_history_aware_retriever`가 담당하고,
+그 뒤의 생성까지를 `create_retrieval_chain`이 묶어 줍니다.
 
 ```python
 from langchain.chains.history_aware_retriever import create_history_aware_retriever
@@ -189,7 +186,7 @@ messages = (
 채팅 UI는 보통 최신 메시지를 먼저 가져오도록 짜기 때문에, 그 쿼리를 그대로 재사용하다가
 쉽게 밟는 함정입니다. **LLM에 넘기는 기록은 별도로 오름차순 정렬**하세요.
 
-### 최신 방식: RunnableWithMessageHistory
+### 기성품 쓰기: RunnableWithMessageHistory
 
 직접 구현하지 않고 기성품을 쓸 수도 있습니다.
 
@@ -237,8 +234,7 @@ result = conversational_rag.invoke(
 RAG에서 대화 기록의 주 용도는 "질문 압축을 위한 최근 문맥"이라, 아주 긴 기록이 필요한 경우가 드뭅니다.
 비용과 지연이 예측 가능해진다는 것도 큰 장점입니다.
 
-예전 LangChain에는 `ConversationBufferMemory`, `ConversationBufferWindowMemory` 같은
-메모리 클래스가 있었지만 지금은 레거시입니다. 기록을 잘라 넘기는 일은 함수 하나로 충분합니다.
+기록을 잘라 넘기는 일에 특별한 장치는 필요 없습니다. 함수 하나면 됩니다.
 
 ```python
 def recent(messages, turns=4):

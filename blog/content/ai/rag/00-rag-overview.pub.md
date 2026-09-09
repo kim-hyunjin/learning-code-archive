@@ -181,10 +181,20 @@ python --version   # 3.10 이상 권장
 1편에서 설치와 키 설정을 처음부터 안내합니다.
 Pinecone·Redis·Celery는 8편 전까지 필요 없고, 그때도 "왜 필요해지는가"를 먼저 설명한 뒤에 붙입니다.
 
-앞으로 쓸 LangChain 코드는 **패키지가 분리된 최신 구조**(`langchain-openai`, `langchain-text-splitters`,
-`langchain-community` 등) 기준입니다. 인터넷에 남아 있는 자료 상당수는 패키지가 하나로 뭉쳐 있던
-`langchain 0.0.x` 시절 코드라 임포트 경로와 체인 API가 다릅니다.
-그런 자료를 만났을 때 헷갈리지 않도록, 10편에 **옛 API → 지금 API 대응표**를 정리해 두었습니다.
+LangChain은 기능별로 패키지가 나뉘어 있습니다. 필요한 것만 골라 설치하면 됩니다.
+
+```bash
+pip install langchain langchain-openai langchain-community langchain-text-splitters
+```
+
+| 패키지 | 담당 |
+|--------|------|
+| `langchain-core` | `Document`, 메시지, 프롬프트, Runnable 같은 기본 타입 |
+| `langchain` | 체인 조립 헬퍼 (`create_retrieval_chain` 등) |
+| `langchain-openai` | OpenAI 채팅 모델과 임베딩 |
+| `langchain-text-splitters` | 청킹 |
+| `langchain-community` | 문서 로더, 일부 벡터 스토어 |
+| `langchain-pinecone`, `langchain-chroma`, `langchain-postgres` | 벡터 스토어별 연동 |
 
 ## 시리즈 목차
 

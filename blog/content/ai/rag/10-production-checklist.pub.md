@@ -158,35 +158,7 @@ RAG는 고장 나도 500이 아니라 "부실한 답변"으로 나타나기 때�
 
 실무에서는 섞어 씁니다. "SQL로 후보를 좁히고 벡터로 검색", "RAG로 근거를 모으고 에이전트가 종합" 같은 식입니다.
 
-## 6. 옛 자료를 만났을 때
-
-RAG 예제는 폭발적으로 쏟아진 시기가 있어서, 검색으로 만나는 코드 상당수가
-패키지가 하나로 뭉쳐 있던 `langchain 0.0.x` 기준입니다. 임포트 경로와 체인 API가 지금과 다릅니다.
-대응표를 알아 두면 그런 자료도 그대로 읽을 수 있습니다.
-
-| 옛 코드 | 지금 |
-|---------|------|
-| `from langchain.chat_models import ChatOpenAI` | `from langchain_openai import ChatOpenAI` |
-| `from langchain.embeddings import OpenAIEmbeddings` | `from langchain_openai import OpenAIEmbeddings` |
-| `from langchain.vectorstores import Pinecone` | `from langchain_pinecone import PineconeVectorStore` |
-| `from langchain.text_splitter import ...` | `from langchain_text_splitters import ...` |
-| `from langchain.document_loaders import ...` | `from langchain_community.document_loaders import ...` |
-| `ConversationalRetrievalChain` | `create_history_aware_retriever` + `create_retrieval_chain` |
-| `ConversationBufferMemory` | `RunnableWithMessageHistory` (또는 기록을 직접 전달) |
-| 커스텀 `StreamableChain` | `chain.stream()` / `chain.astream_events()` |
-| 커스텀 `StreamingHandler` | 위와 동일. 태그·이벤트 이름으로 구분 |
-
-**그럼 옛 자료는 볼 가치가 없나?** 그렇지 않습니다.
-API는 바뀌어도 개념은 그대로입니다.
-
-- 압축 → 검색 → 생성의 3단계
-- 콜백이 체인 전체에 전파되므로 `run_id`/태그로 구분해야 한다는 것
-- 대화 기록을 앱 DB에 영속화하는 이유
-- 컴포넌트를 교체 가능하게 만들어 실험하는 구조
-
-라이브러리가 감춰 주는 것이 많아질수록, **감춰진 것이 무엇인지 아는 사람**이 디버깅을 합니다.
-
-## 7. 최종 체크리스트
+## 6. 최종 체크리스트
 
 ### 인제스트
 
@@ -218,7 +190,7 @@ API는 바뀌어도 개념은 그대로입니다.
 - [ ] `<context>` 안의 내용을 지시로 따르지 않도록 프롬프트가 방어한다
 - [ ] API 키가 환경 변수로만 관리되고, 로그에 민감 정보가 남지 않는다
 
-## 8. 시리즈를 마치며
+## 7. 시리즈를 마치며
 
 11편을 요약하면 이렇습니다.
 

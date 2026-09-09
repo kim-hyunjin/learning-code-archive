@@ -210,9 +210,8 @@ def build_retriever(pdf_id: str, k: int = 4):
     )
 ```
 
-> 예전 자료에는 `from langchain.vectorstores import Pinecone`처럼 임포트하는 코드가 많습니다.
-> 지금은 스토어마다 패키지가 분리되어 `langchain_pinecone`, `langchain_chroma`,
-> `langchain_postgres` 같은 이름을 씁니다. 클래스 이름도 `PineconeVectorStore`로 바뀌었습니다.
+> 벡터 스토어는 스토어마다 연동 패키지가 따로 있습니다.
+> `langchain-pinecone`, `langchain-chroma`, `langchain-postgres`처럼 필요한 것만 설치해 쓰면 됩니다.
 
 `from_existing_index`라는 이름 그대로, **인덱스는 미리 만들어져 있다고 가정**합니다.
 앱이 뜰 때마다 인덱스를 만들지 않는 것은 옳은 설계입니다. 인덱스 생성은 배포 시 한 번 하는 작업입니다.

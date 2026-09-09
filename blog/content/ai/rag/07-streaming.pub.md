@@ -23,7 +23,7 @@ summary: "답변을 토큰 단위로 흘려보내는 방법을 다룹니다. LCE
 
 ## 1. 가장 간단한 스트리밍
 
-최신 LangChain에서는 `invoke` 대신 `stream`을 부르면 됩니다.
+LangChain에서는 `invoke` 대신 `stream`을 부르면 됩니다.
 
 ```python
 for chunk in rag_chain.stream({"input": "이 문서의 핵심은?"}):
@@ -62,7 +62,7 @@ async for event in rag_chain.astream_events({"input": q}, version="v2"):
 
 - 후처리(문장 단위 버퍼링, 마스킹, 인용 각주 삽입)를 토큰 흐름 중간에 끼워야 할 때
 - LangChain 밖의 **블로킹 호출**을 스트리밍 응답으로 감싸야 할 때
-- 오래된 예제나 사내 코드가 이 구조로 되어 있어 읽어야 할 때
+- 동기 프레임워크(Flask 등)에서 비동기 API를 쓰기 어려울 때
 
 원리는 단순합니다. 블로킹 호출을 별도 스레드에 맡기고, 콜백이 토큰을 큐에 넣고,
 제너레이터가 큐에서 꺼내 흘려보냅니다.
@@ -166,7 +166,7 @@ class StreamingHandler(BaseCallbackHandler):
 콜백이 여러 호출에서 공유되더라도, 이 ID로 "지금 이건 누구의 이벤트인가"를 구분할 수 있습니다.
 
 > **교훈: 콜백은 전역이다. 어떤 호출의 이벤트인지 `run_id`로 구분하라.**
-> 최신 LCEL에서도 마찬가지입니다. `astream_events`로 `event["name"]`이나
+> `astream_events`를 쓸 때도 마찬가지입니다. `event["name"]`이나
 > `.with_config(tags=["answer"])`로 붙인 태그를 보고 걸러야, 압축용 토큰이 새어 나가지 않습니다.
 
 `on_llm_error`에서도 `None`을 넣는 것을 눈여겨보세요.
@@ -350,7 +350,7 @@ const text = decoder.decode(value, { stream: true });
 ## 6. 정리
 
 - 스트리밍은 실제 속도가 아니라 **체감 속도**를 바꾼다. 첫 토큰까지의 시간이 핵심 지표다.
-- 최신 LangChain은 `chain.stream()` / `astream_events()`로 대부분 해결된다.
+- `chain.stream()` / `astream_events()`로 대부분 해결된다.
 - 직접 구현한다면 **큐 + 스레드 + 종료 sentinel** 패턴이다.
   종료 신호는 콜백이 아니라 **`finally`** 에 둔다. 콜백은 LLM 이전 단계의 실패를 잡지 못한다.
 - **콜백은 체인의 모든 LLM에 전파된다.** `run_id`나 태그로 어떤 호출인지 구분하라.
