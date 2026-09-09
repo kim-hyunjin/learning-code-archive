@@ -44,6 +44,7 @@ const TOPIC_LABELS: Record<string, string> = {
   'design-architecture/design-patterns-refactoring': 'Design Patterns & Refactoring',
   'frontend/react': 'React',
   'frontend/vue': 'Vue',
+  'language/cpp': 'C++',
   'language/java': 'Java',
   'language/kotlin': 'Kotlin',
   'mobile/android': 'Android',
