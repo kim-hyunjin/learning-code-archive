@@ -14,8 +14,8 @@ summary: "PDF에 질문하면 답하는 RAG 앱을 처음부터 만드는 시리
 ---
 
 이 시리즈는 **PDF를 업로드하면 그 내용에 대해 대화할 수 있는 앱**을 처음부터 만들어 보는 글입니다.
-저장소의 `ai/langchain/udemy-masterclass/pdf-app` 코드를 교재 삼아, 실제로 돌아가는 앱이
-어떤 조각으로 이루어져 있는지 한 겹씩 벗겨 봅니다.
+파일 하나짜리 스크립트에서 출발해, 실제로 서비스할 수 있는 앱이 어떤 조각으로
+이루어져 있는지 한 겹씩 쌓아 올립니다.
 
 **대상 독자**는 이렇습니다.
 
@@ -101,12 +101,13 @@ flowchart LR
 RAG를 처음 배울 때 가장 흔한 혼란이 "이 코드가 언제 실행되는 코드인지" 헷갈리는 것입니다.
 파일을 열 때마다 **"이건 ①인가 ②인가"** 를 먼저 물어보세요. 그것만으로 절반은 이해한 셈입니다.
 
-## 우리가 읽을 앱: pdf-app
+## 우리가 만들 앱의 구조
 
-`pdf-app`은 위 두 파이프라인을 실제 서비스 형태로 구현한 앱입니다. 구조는 이렇습니다.
+위 두 파이프라인을 실제 서비스 형태로 구현하면 대략 이런 모습이 됩니다.
+시리즈 전체가 이 구조를 향해 갑니다.
 
 ```text
-pdf-app/
+rag-app/
 ├── app/
 │   ├── web/                    # Flask 웹 서버 (②의 입구, ①의 트리거)
 │   │   ├── views/              #   업로드·대화·점수 API
@@ -139,6 +140,7 @@ pdf-app/
 
 한 번에 다 필요하지는 않습니다. **1편에서는 파일 하나짜리 스크립트로 시작**해서,
 편이 넘어갈 때마다 조각을 하나씩 붙여 이 구조에 도달합니다.
+Flask·Celery·Pinecone은 예시일 뿐이고, 각 자리에 어떤 선택지가 있는지도 해당 편에서 함께 다룹니다.
 
 ## 질문 하나가 처리되는 전체 흐름
 
@@ -179,10 +181,20 @@ python --version   # 3.10 이상 권장
 1편에서 설치와 키 설정을 처음부터 안내합니다.
 Pinecone·Redis·Celery는 8편 전까지 필요 없고, 그때도 "왜 필요해지는가"를 먼저 설명한 뒤에 붙입니다.
 
-앞으로 쓸 LangChain 코드는 **패키지가 분리된 최신 구조**(`langchain-openai`, `langchain-community` 등) 기준입니다.
-`pdf-app`은 `langchain==0.0.352` 시절 코드라 임포트 경로가 다른데,
-차이가 있는 곳마다 "옛 코드 → 지금 코드"를 나란히 보여 드립니다.
-**개념은 그대로**이므로 옛 코드를 읽는 것은 여전히 가치가 있습니다.
+LangChain은 기능별로 패키지가 나뉘어 있습니다. 필요한 것만 골라 설치하면 됩니다.
+
+```bash
+pip install langchain langchain-openai langchain-community langchain-text-splitters
+```
+
+| 패키지 | 담당 |
+|--------|------|
+| `langchain-core` | `Document`, 메시지, 프롬프트, Runnable 같은 기본 타입 |
+| `langchain` | 체인 조립 헬퍼 (`create_retrieval_chain` 등) |
+| `langchain-openai` | OpenAI 채팅 모델과 임베딩 |
+| `langchain-text-splitters` | 청킹 |
+| `langchain-community` | 문서 로더, 일부 벡터 스토어 |
+| `langchain-pinecone`, `langchain-chroma`, `langchain-postgres` | 벡터 스토어별 연동 |
 
 ## 시리즈 목차
 

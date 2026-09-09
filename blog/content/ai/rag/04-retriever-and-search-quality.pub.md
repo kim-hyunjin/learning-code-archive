@@ -49,31 +49,34 @@ retriever = store.as_retriever(search_kwargs={"k": 4})
 | **4~8** | **대부분의 문서에서 무난한 출발점.** |
 | 10 이상 | 근거는 많아지지만 노이즈와 토큰 비용이 늘고, 중요한 내용이 가운데 묻힐 수 있습니다. |
 
-`pdf-app`은 k를 1, 2, 3으로 등록해 두고 비교합니다(`app/chat/vector_stores/__init__.py`).
+**k=4에서 시작**하세요. 청크가 500자인데 k=2라면 겨우 1000자 분량의 근거로 답을 만드는 셈이고,
+반대로 청크가 2000자인데 k=10이면 근거만 2만 자입니다. **청크 크기 × k**를 함께 보는 것이 요령입니다.
+
+값을 하나로 못 정하겠다면 후보를 여러 개 등록해 두고 비교할 수도 있습니다.
 
 ```python
+from functools import partial
+
 retriever_map = {
-    "pinecone_1": partial(build_retriever, k=1),
-    "pinecone_2": partial(build_retriever, k=2),
-    "pinecone_3": partial(build_retriever, k=3),
+    "top_2": partial(build_retriever, k=2),
+    "top_4": partial(build_retriever, k=4),
+    "top_8": partial(build_retriever, k=8),
 }
 ```
 
 `functools.partial`은 "인자 일부를 미리 채워 둔 함수"를 만드는 도구입니다.
-`build_retriever(chat_args, k)` 중 `k`만 고정해 두고, 나중에 `chat_args`만 넘겨 호출하는 식이죠.
+`build_retriever(pdf_id, k)` 중 `k`만 고정해 두고, 나중에 `pdf_id`만 넘겨 호출하는 식이죠.
 이렇게 **후보를 여러 개 등록해 두고 실제 사용자 반응으로 비교하는 구조**는 9편에서 자세히 다룹니다.
-
-다만 이 값들은 다소 작습니다. 청크가 500자라면 k=2는 겨우 1000자 분량의 근거로 답을 만드는 셈입니다.
-직접 만들 때는 **k=4에서 시작**하세요.
 
 ## 3. 메타데이터 필터 — 기능이자 보안 장치
 
-`pdf-app`의 리트리버는 이렇게 생겼습니다.
+리트리버를 만드는 함수는 보통 이렇게 생깁니다.
 
 ```python
-def build_retriever(chat_args: ChatArgs, k):
-    search_kwargs = {"filter": {"pdf_id": chat_args.pdf_id}, "k": k}
-    return vector_store.as_retriever(search_kwargs=search_kwargs)
+def build_retriever(pdf_id: str, k: int = 4):
+    return vector_store.as_retriever(
+        search_kwargs={"filter": {"pdf_id": pdf_id}, "k": k}
+    )
 ```
 
 `filter`는 "이 조건에 맞는 벡터 중에서만 유사도 검색을 하라"는 뜻입니다.
@@ -84,7 +87,7 @@ def build_retriever(chat_args: ChatArgs, k):
 
 ```python
 search_kwargs = {
-    "filter": {"pdf_id": chat_args.pdf_id, "user_id": chat_args.user_id},
+    "filter": {"pdf_id": pdf_id, "user_id": user_id},
     "k": k,
 }
 ```

@@ -82,7 +82,8 @@ SYSTEM = """<context>는 사용자가 업로드한 문서에서 검색된 참고
 - 가능하면 테넌트별 **네임스페이스나 인덱스 분리**를 쓴다
 - 문서를 삭제하면 **벡터도 함께 삭제**한다
 - 대화·문서 조회 API마다 소유권을 검사한다
-  (`pdf-app`은 `@load_model` 데코레이터가 `instance.user_id != g.user.id`를 확인합니다)
+  (조회 헬퍼나 데코레이터 한 곳에서 `instance.user_id != current_user.id`를 확인하게 만들면
+  뷰마다 빠뜨릴 일이 없습니다)
 
 ### 개인정보와 키
 
@@ -157,33 +158,7 @@ RAG는 고장 나도 500이 아니라 "부실한 답변"으로 나타나기 때�
 
 실무에서는 섞어 씁니다. "SQL로 후보를 좁히고 벡터로 검색", "RAG로 근거를 모으고 에이전트가 종합" 같은 식입니다.
 
-## 6. 최신 LangChain으로 옮기기
-
-`pdf-app`은 `langchain==0.0.352` 기준이라 지금과 임포트 경로와 API가 다릅니다. 대응표입니다.
-
-| 옛 코드 | 지금 |
-|---------|------|
-| `from langchain.chat_models import ChatOpenAI` | `from langchain_openai import ChatOpenAI` |
-| `from langchain.embeddings import OpenAIEmbeddings` | `from langchain_openai import OpenAIEmbeddings` |
-| `from langchain.vectorstores import Pinecone` | `from langchain_pinecone import PineconeVectorStore` |
-| `from langchain.text_splitter import ...` | `from langchain_text_splitters import ...` |
-| `from langchain.document_loaders import ...` | `from langchain_community.document_loaders import ...` |
-| `ConversationalRetrievalChain` | `create_history_aware_retriever` + `create_retrieval_chain` |
-| `ConversationBufferMemory` | `RunnableWithMessageHistory` (또는 기록을 직접 전달) |
-| 커스텀 `StreamableChain` | `chain.stream()` / `chain.astream_events()` |
-| 커스텀 `StreamingHandler` | 위와 동일. 태그·이벤트 이름으로 구분 |
-
-**그럼 옛 코드를 읽는 것이 의미가 없나?** 그렇지 않습니다.
-API는 바뀌어도 개념은 그대로입니다.
-
-- 압축 → 검색 → 생성의 3단계
-- 콜백이 체인 전체에 전파되므로 `run_id`/태그로 구분해야 한다는 것
-- 대화 기록을 앱 DB에 영속화하는 이유
-- 컴포넌트를 교체 가능하게 만들어 실험하는 구조
-
-라이브러리가 감춰 주는 것이 많아질수록, **감춰진 것이 무엇인지 아는 사람**이 디버깅을 합니다.
-
-## 7. 최종 체크리스트
+## 6. 최종 체크리스트
 
 ### 인제스트
 
@@ -215,7 +190,7 @@ API는 바뀌어도 개념은 그대로입니다.
 - [ ] `<context>` 안의 내용을 지시로 따르지 않도록 프롬프트가 방어한다
 - [ ] API 키가 환경 변수로만 관리되고, 로그에 민감 정보가 남지 않는다
 
-## 8. 시리즈를 마치며
+## 7. 시리즈를 마치며
 
 11편을 요약하면 이렇습니다.
 

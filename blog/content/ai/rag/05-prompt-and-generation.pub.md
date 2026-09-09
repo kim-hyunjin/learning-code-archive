@@ -147,7 +147,7 @@ print("근거:", ", ".join(f"{page}쪽" for _, page in sources))
 ```
 
 UI에서는 이 페이지 번호를 **PDF 뷰어의 해당 페이지로 이동하는 링크**로 만들면 좋습니다.
-`pdf-app`의 프론트엔드가 PDF 뷰어와 채팅 패널을 나란히 두는 이유가 이것입니다.
+문서 뷰어와 채팅 패널을 나란히 두는 화면 구성이 흔한 이유가 이것입니다.
 사용자가 답을 즉시 검증할 수 있으면, 환각의 위험이 크게 줄어듭니다.
 
 ## 4. 컨텍스트 예산 계산하기
@@ -195,28 +195,29 @@ map-reduce/refine이 필요하다고 느껴진다면, 대개는 검색을 개선
 
 ## 5. 모델 고르기
 
-`pdf-app`은 후보 두 개를 등록해 두고 비교합니다(`app/chat/llms/__init__.py`).
+모델도 후보를 등록해 두고 비교할 수 있습니다. 4편의 리트리버와 같은 구조입니다.
 
 ```python
+from functools import partial
+
+def build_llm(model: str, streaming: bool = False):
+    return ChatOpenAI(model=model, temperature=0, streaming=streaming)
+
 llm_map = {
-    "gpt-4": partial(build_llm, model_name="gpt-4"),
-    "gpt-3.5-turbo": partial(build_llm, model_name="gpt-3.5-turbo"),
+    "small": partial(build_llm, model="gpt-4o-mini"),
+    "large": partial(build_llm, model="gpt-4o"),
 }
 ```
 
-```python
-def build_llm(chat_args: ChatArgs, model_name):
-    return ChatOpenAI(streaming=chat_args.streaming, model_name=model_name)
-```
-
-지금 새로 만든다면 최신 모델로 바꾸면 됩니다. 선택 기준은 단순합니다.
+모델 이름은 계속 바뀌므로 **코드에 흩뿌리지 말고 이렇게 한곳에 모아 두세요.**
+새 모델이 나오면 이 맵만 고치면 됩니다. 선택 기준은 단순합니다.
 
 - **작고 빠른 모델로 시작하세요.** RAG는 근거를 프롬프트에 넣어 주므로,
   "지식"보다 "주어진 텍스트를 읽고 정리하는 능력"이 중요합니다. 이건 작은 모델도 꽤 잘합니다.
 - 답변이 부실하면 **모델을 키우기 전에 검색부터 의심**하세요.
 - 요약·번역 같은 단순 작업은 작은 모델, 여러 근거를 종합하는 추론은 큰 모델로 나눠도 좋습니다.
 
-`streaming=chat_args.streaming`이라는 인자가 눈에 띌 텐데, 7편에서 이 플래그가
+`streaming` 인자가 눈에 띌 텐데, 7편에서 이 플래그가
 왜 중요하고 어떤 함정을 만드는지 자세히 다룹니다.
 
 ### temperature

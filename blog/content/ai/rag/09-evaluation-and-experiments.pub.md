@@ -21,43 +21,48 @@ summary: "컴포넌트를 맵으로 등록해 조합을 실험하는 구조, 사
 이걸 감으로 정하면 끝이 없습니다. 답변 몇 개를 읽어 보고 "이게 나은 것 같은데"라고 판단하는 것은
 표본이 너무 적고, 무엇보다 **어제의 나와 오늘의 나가 다른 기준**을 씁니다.
 
-`pdf-app`이 특히 잘한 부분이 이 문제를 **코드로 푼 것**입니다.
+이 문제는 **코드로 푸는 것**이 답입니다. 선택지를 코드에 등록해 두고, 실제 사용 데이터로 고르게 만듭니다.
 
 ## 1. 컴포넌트를 맵으로 등록한다
 
-`pdf-app`은 각 컴포넌트를 **이름 → 생성 함수**의 딕셔너리로 등록합니다.
+각 컴포넌트를 **이름 → 생성 함수**의 딕셔너리로 등록합니다.
+4편과 5편에서 리트리버와 LLM을 이렇게 등록해 둔 것을 한데 모으는 것입니다.
 
 ```python
-# app/chat/vector_stores/__init__.py
+from functools import partial
+
+# 리트리버 후보
 retriever_map = {
-    "pinecone_1": partial(build_retriever, k=1),
-    "pinecone_2": partial(build_retriever, k=2),
-    "pinecone_3": partial(build_retriever, k=3),
+    "top_2": partial(build_retriever, k=2),
+    "top_4": partial(build_retriever, k=4),
+    "top_8": partial(build_retriever, k=8),
 }
 
-# app/chat/llms/__init__.py
+# LLM 후보
 llm_map = {
-    "gpt-4": partial(build_llm, model_name="gpt-4"),
-    "gpt-3.5-turbo": partial(build_llm, model_name="gpt-3.5-turbo"),
+    "small": partial(build_llm, model="gpt-4o-mini"),
+    "large": partial(build_llm, model="gpt-4o"),
 }
 
-# app/chat/memories/__init__.py
+# 대화 기록 전략 후보
 memory_map = {
-    "sql_buffer_memory": build_memory,
-    "sql_window_memory": window_buffer_memory_builder,
+    "full": build_full_history,
+    "window_3": partial(build_window_history, turns=3),
 }
 ```
 
 이제 조합은 3 × 2 × 2 = 12가지입니다. `build_chat`이 대화마다 하나를 뽑습니다.
 
 ```python
-def build_chat(chat_args: ChatArgs):
-    retriever_name, retriever = select_component("retriever", retriever_map, chat_args)
-    llm_name, llm = select_component("llm", llm_map, chat_args)
-    memory_name, memory = select_component("memory", memory_map, chat_args)
+def build_chat(conversation_id: str, pdf_id: str):
+    retriever_name, retriever = select_component(
+        "retriever", retriever_map, conversation_id, pdf_id=pdf_id
+    )
+    llm_name, llm = select_component("llm", llm_map, conversation_id)
+    memory_name, memory = select_component("memory", memory_map, conversation_id)
 
     set_conversation_components(
-        conversation_id=chat_args.conversation_id,
+        conversation_id=conversation_id,
         llm=llm_name, retriever=retriever_name, memory=memory_name,
     )
     ...
@@ -68,15 +73,15 @@ def build_chat(chat_args: ChatArgs):
 `set_conversation_components`가 결정적입니다. 뽑은 조합을 **대화 레코드에 기록**해 두고,
 
 ```python
-def select_component(component_type, component_map, chat_args):
-    components = get_conversation_components(chat_args.conversation_id)
+def select_component(component_type, component_map, conversation_id, **kwargs):
+    components = get_conversation_components(conversation_id)
     previous_component = components[component_type]
 
     if previous_component:                      # 이미 정해진 대화면 그대로
-        return previous_component, component_map[previous_component](chat_args)
+        return previous_component, component_map[previous_component](**kwargs)
 
     random_name = random_component_by_score(component_type, component_map)
-    return random_name, component_map[random_name](chat_args)
+    return random_name, component_map[random_name](**kwargs)
 ```
 
 **같은 대화에서는 계속 같은 조합**을 씁니다. 이게 없으면 메시지마다 모델이 바뀌어서
@@ -132,12 +137,12 @@ def random_component_by_score(component_type, component_map):
 ### 이 구조에서 실수하기 쉬운 두 가지
 
 이 되먹임 루프는 **틀려도 에러가 나지 않습니다.** 그냥 조용히 동작하지 않을 뿐이죠.
-`pdf-app`도 두 가지 문제를 겪었습니다.
+실제로 자주 나오는 사고가 둘 있습니다.
 
 **① 쓰는 키와 읽는 키가 어긋나는 것.**
-예전 코드는 저장할 때 `llm_srore_values`(오타), 읽을 때 `llm_score_values`를 썼습니다.
-점수는 꼬박꼬박 쌓였지만 **선택에는 전혀 반영되지 않았습니다.**
-지금은 키를 함수로 만들어 한 곳에서 생성합니다.
+저장할 때 `llm_srore_values`(오타), 읽을 때 `llm_score_values`를 쓰는 식입니다.
+점수는 꼬박꼬박 쌓이지만 **선택에는 전혀 반영되지 않습니다.**
+키는 함수로 만들어 한 곳에서 생성하세요.
 
 ```python
 def _values_key(component_type: str) -> str:
@@ -193,41 +198,46 @@ RAG는 중간 단계가 많습니다. 답변이 이상할 때 확인해야 할 �
 
 이걸 `print`로 쫓아다니는 것은 금방 한계가 옵니다. **트레이싱 도구**를 붙이세요.
 
-`pdf-app`은 Langfuse를 쓰고, 붙이는 방법이 재미있습니다(`app/chat/chains/traceable.py`).
-
-```python
-class TraceableChain:
-    def __call__(self, *args, **kwargs):
-        trace = langfuse.trace(
-            CreateTrace(id=self.metadata["conversation_id"], metadata=self.metadata)
-        )
-        callbacks = kwargs.get("callbacks", [])
-        callbacks.append(trace.getNewHandler())
-        kwargs["callbacks"] = callbacks
-        return super().__call__(*args, **kwargs)
-```
-
-그리고 믹스인으로 섞습니다.
-
-```python
-class StreamingConversationalRetrievalChain(
-    TraceableChain, StreamableChain, ConversationalRetrievalChain
-):
-    pass
-```
-
-파이썬의 **MRO(Method Resolution Order)** 를 이용한 구조입니다.
-`chain(...)`을 호출하면 왼쪽부터 찾아서 `TraceableChain.__call__`이 먼저 실행되고,
-트레이스 핸들러를 추가한 뒤 `super().__call__`로 다음 클래스에 넘깁니다.
-**체인 호출 코드를 한 줄도 고치지 않고** 모든 호출에 관측이 붙습니다.
-
-같은 목적의 도구로 LangSmith, Langfuse, Phoenix 등이 있고,
-요즘 LangChain은 환경 변수만으로 켜지는 경우가 많습니다.
+LangSmith는 환경 변수만으로 켜집니다. 코드를 한 줄도 고치지 않아도 됩니다.
 
 ```bash
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=...
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=...
+LANGSMITH_PROJECT=rag-app      # 프로젝트 단위로 트레이스를 모은다
 ```
+
+Langfuse, Phoenix 같은 도구는 콜백 핸들러를 호출 설정에 얹는 방식입니다.
+
+```python
+from langfuse.langchain import CallbackHandler
+
+rag_chain.invoke(
+    {"input": question, "chat_history": history},
+    config={"callbacks": [CallbackHandler()]},
+)
+```
+
+**여기서 중요한 것은 호출마다 식별 정보를 함께 남기는 것**입니다.
+어떤 대화였고 어떤 조합이 뽑혔는지가 트레이스에 없으면, 나중에 "낮은 점수를 받은 그 대화"를
+찾아갈 수 없습니다.
+
+```python
+config = {
+    "run_name": "rag-answer",
+    "metadata": {
+        "conversation_id": conversation_id,
+        "llm": llm_name,
+        "retriever": retriever_name,
+        "memory": memory_name,
+    },
+    "tags": ["prod"],
+}
+
+rag_chain.invoke({"input": question, "chat_history": history}, config=config)
+```
+
+`config`는 체인 전체에 전파되므로, 압축용 LLM 호출과 검색까지 같은 트레이스에 묶입니다.
+7편에서 콜백이 체인의 모든 LLM에 전파된다고 한 성질이 여기서는 장점이 됩니다.
 
 > **트레이싱은 선택이 아니라 필수입니다.** RAG는 "왜 이런 답이 나왔는지"가
 > 코드만 봐서는 절대 알 수 없는 시스템입니다.

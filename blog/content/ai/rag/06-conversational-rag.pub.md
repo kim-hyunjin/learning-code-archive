@@ -62,34 +62,10 @@ flowchart TB
 **LLM을 두 번 호출**한다는 점을 기억하세요. 지연과 비용이 두 배 가까이 됩니다.
 그래서 압축용 LLM은 작고 빠른 모델을 쓰는 것이 좋습니다.
 
-## 2. `pdf-app`의 구현
+## 2. 코드로 만들기
 
-`app/chat/chat.py`는 LangChain의 `ConversationalRetrievalChain`을 씁니다.
-이 체인이 위 흐름(압축 → 검색 → 생성)을 통째로 담고 있습니다.
-
-```python
-condense_question_llm = ChatOpenAI(streaming=False)
-
-return StreamingConversationalRetrievalChain.from_llm(
-    llm=llm,                                     # 최종 답변용 (스트리밍)
-    condense_question_llm=condense_question_llm, # 질문 압축용 (비스트리밍)
-    memory=memory,
-    retriever=retriever,
-    metadata=chat_args.metadata,
-)
-```
-
-여기서 `condense_question_llm`에 `streaming=False`가 붙은 것이 중요합니다.
-압축용 LLM의 출력은 **내부 처리용 문장**이라 사용자에게 보이면 안 됩니다.
-이걸 스트리밍으로 두면 "ReAct 프레임워크 접근법의 한계는..."이라는 재작성 문장이
-사용자 화면에 튀어나옵니다. 7편에서 이 함정을 자세히 뜯어봅니다.
-
-> `ConversationalRetrievalChain`은 현재 **레거시**로 분류됩니다.
-> 개념은 그대로 유효하지만, 새로 만든다면 아래의 최신 조합을 쓰세요.
-
-## 3. 최신 방식으로 다시 만들기
-
-지금 LangChain에서는 압축과 검색을 `create_history_aware_retriever`가 담당합니다.
+LangChain에서는 압축과 검색을 `create_history_aware_retriever`가 담당하고,
+그 뒤의 생성까지를 `create_retrieval_chain`이 묶어 줍니다.
 
 ```python
 from langchain.chains.history_aware_retriever import create_history_aware_retriever
@@ -148,7 +124,11 @@ for question in ["ReAct의 핵심 아이디어가 뭐야?", "그거 한계는?"]
 > `create_history_aware_retriever`는 **대화 기록이 비어 있으면 압축을 건너뛰고** 질문을 그대로 검색합니다.
 > 첫 질문에서 불필요한 LLM 호출이 일어나지 않도록 되어 있습니다.
 
-## 4. 대화 기록을 어디에 둘 것인가
+압축용 LLM에는 **스트리밍을 켜지 마세요.** 압축 결과는 내부 처리용 문장이라
+사용자에게 보이면 안 되는데, 스트리밍을 켜 두면 "ReAct 프레임워크 접근법의 한계는..." 같은
+재작성 문장이 화면에 그대로 튀어나옵니다. 7편에서 이 함정을 자세히 뜯어봅니다.
+
+## 3. 대화 기록을 어디에 둘 것인가
 
 위 코드는 기록을 파이썬 리스트에 담았습니다. 스크립트로는 충분하지만 서비스로는 안 됩니다.
 
@@ -158,8 +138,8 @@ for question in ["ReAct의 핵심 아이디어가 뭐야?", "그거 한계는?"]
 
 그래서 **대화 기록은 애플리케이션 DB에 저장**합니다.
 
-`pdf-app`은 LangChain의 `BaseChatMessageHistory` 인터페이스를 직접 구현해서
-저장소를 자기 DB로 바꿉니다(`app/chat/memories/histories/sql_history.py`).
+LangChain의 `BaseChatMessageHistory` 인터페이스를 직접 구현하면
+저장소를 앱의 DB로 바꿀 수 있습니다.
 
 ```python
 class SqlMessageHistory(BaseChatMessageHistory, BaseModel):
@@ -200,12 +180,13 @@ messages = (
 내림차순으로 주면 두 가지가 동시에 망가집니다.
 
 1. 질문 압축 프롬프트에 대화가 **거꾸로** 들어가 문맥 해석이 틀어집니다.
-2. 뒤에 나올 윈도우 메모리가 "최근 k개"가 아니라 "**가장 오래된 k개**"를 집습니다.
+2. 뒤에 나올 윈도우 전략이 "최근 k턴"이 아니라 "**가장 오래된 k턴**"을 집습니다.
 
 에러가 나지 않고 답변만 조금씩 이상해지는 종류의 버그라, 발견이 늦습니다.
-`pdf-app`에도 이 문제가 있었고 지금은 `asc()`로 고쳐져 있습니다.
+채팅 UI는 보통 최신 메시지를 먼저 가져오도록 짜기 때문에, 그 쿼리를 그대로 재사용하다가
+쉽게 밟는 함정입니다. **LLM에 넘기는 기록은 별도로 오름차순 정렬**하세요.
 
-### 최신 방식: RunnableWithMessageHistory
+### 기성품 쓰기: RunnableWithMessageHistory
 
 직접 구현하지 않고 기성품을 쓸 수도 있습니다.
 
@@ -233,13 +214,13 @@ result = conversational_rag.invoke(
 ```
 
 체인 호출 전후로 기록을 읽고 쓰는 일을 대신해 줍니다.
-`session_id`가 대화 하나를 가리키는 키입니다(`pdf-app`의 `conversation_id`에 해당).
+`session_id`가 대화 하나를 가리키는 키입니다(앱의 `conversation_id`에 해당).
 
 **직접 구현 vs 기성품** 판단 기준은 이렇습니다.
 메시지가 앱의 다른 기능(목록 조회, 검색, 관리자 화면)에도 쓰인다면
-`pdf-app`처럼 자기 테이블에 붙이는 편이 낫고, 대화 기록이 오직 LLM용이라면 기성품으로 충분합니다.
+앱의 `Message` 테이블에 붙이는 편이 낫고, 대화 기록이 오직 LLM용이라면 기성품으로 충분합니다.
 
-## 5. 메모리 전략: 기록을 얼마나 넣을 것인가
+## 4. 메모리 전략: 기록을 얼마나 넣을 것인가
 
 대화가 길어지면 기록 전체를 프롬프트에 넣을 수 없습니다. 선택지가 있습니다.
 
@@ -249,31 +230,11 @@ result = conversational_rag.invoke(
 | **윈도우** | 최근 k턴만 | 저렴·빠름·예측 가능 | 오래된 맥락 손실 |
 | **요약** | 오래된 기록을 요약해 압축 | 긴 대화에 강함 | 요약에 LLM 호출 추가, 정보 손실 |
 
-`pdf-app`은 앞의 두 가지를 등록해 두고 비교합니다(`app/chat/memories/__init__.py`).
-
-```python
-memory_map = {
-    "sql_buffer_memory": build_memory,               # ConversationBufferMemory
-    "sql_window_memory": window_buffer_memory_builder,  # k=2 윈도우
-}
-```
-
-```python
-def window_buffer_memory_builder(chat_args: ChatArgs):
-    return ConversationBufferWindowMemory(
-        memory_key="chat_history",
-        output_key="answer",
-        return_messages=True,
-        chat_memory=SqlMessageHistory(conversation_id=chat_args.conversation_id),
-        k=2,   # 최근 2턴만 사용
-    )
-```
-
-**추천은 윈도우 메모리(k=3~5)에서 시작하는 것**입니다.
+**추천은 윈도우 전략(최근 3~5턴)에서 시작하는 것**입니다.
 RAG에서 대화 기록의 주 용도는 "질문 압축을 위한 최근 문맥"이라, 아주 긴 기록이 필요한 경우가 드뭅니다.
 비용과 지연이 예측 가능해진다는 것도 큰 장점입니다.
 
-최신 방식에서는 기록을 잘라 넘기는 것을 함수 하나로 처리할 수 있습니다.
+기록을 잘라 넘기는 일에 특별한 장치는 필요 없습니다. 함수 하나면 됩니다.
 
 ```python
 def recent(messages, turns=4):
@@ -285,7 +246,21 @@ result = rag_chain.invoke({
 })
 ```
 
-## 6. 대화형 RAG에서 자주 겪는 문제
+토큰 수 기준으로 자르고 싶다면 `trim_messages`를 쓰면 됩니다.
+
+```python
+from langchain_core.messages import trim_messages
+
+trimmed = trim_messages(
+    history,
+    max_tokens=1500,
+    token_counter=llm,        # 모델의 토크나이저로 계산
+    strategy="last",          # 최근 메시지부터 채운다
+    start_on="human",         # 사용자 메시지에서 시작하도록 경계를 맞춘다
+)
+```
+
+## 5. 대화형 RAG에서 자주 겪는 문제
 
 | 증상 | 원인 | 대응 |
 |------|------|------|
@@ -317,4 +292,4 @@ for d in docs:
 3. `chat_history`를 일부러 역순으로 넣어 보세요. 어떤 답변이 나오나요?
 
 다음 편은 **스트리밍**입니다. 답변이 한 번에 뚝 나오는 대신 토큰 단위로 흘러나오게 만들고,
-그 과정에서 `pdf-app`이 마주친 까다로운 함정 하나를 해부합니다.
+그 과정에서 대화형 RAG가 반드시 마주치는 까다로운 함정 하나를 해부합니다.
