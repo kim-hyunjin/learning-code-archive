@@ -68,7 +68,7 @@
 
 
 
-<table><thead><tr><th>배경</th><th>추천</th></tr></thead><tbody><tr><td><strong>Rust를 전혀 모름</strong></td><td>00 → 01<del>03을 천천히 → <code>cargo run</code>으로 00 실습 → 04</del>07 → 나머지</td></tr><tr><td><strong>Rust는 알지만 웹 프레임워크가 처음</strong></td><td>00, 04<del>12를 중심으로, 01</del>03은 참고</td></tr><tr><td><strong>백엔드 시니어</strong></td><td>00·07·08·13 + 소스 직접 대조. 각 편 <strong>「심화」</strong> 절 위주</td></tr></tbody></table>
+<table><thead><tr><th>배경</th><th>추천</th></tr></thead><tbody><tr><td><strong>Rust를 전혀 모름</strong></td><td>00 → 01~03을 천천히 → <code>cargo run</code>으로 00 실습 → 04~07 → 나머지</td></tr><tr><td><strong>Rust는 알지만 웹 프레임워크가 처음</strong></td><td>00, 04~12를 중심으로, 01~03은 참고</td></tr><tr><td><strong>백엔드 시니어</strong></td><td>00·07·08·13 + 소스 직접 대조. 각 편 <strong>「심화」</strong> 절 위주</td></tr></tbody></table>
 <p>막히면 <strong>컴파일러 에러 메시지를 그대로 검색</strong>하는 것이 Rust 학습에서 가장 빠른 길입니다. <code>cargo check</code> 출력은 “어느 파일·어느 타입이 안 맞는지”를 정확히 알려 줍니다.</p>
 <h2 id="레이어-책임-최종">레이어 책임 (최종)<a class="heading-anchor" aria-label="이 제목으로 연결" href="#레이어-책임-최종"></a></h2>
 <pre class="mermaid">flowchart TB
@@ -181,7 +181,7 @@
 <li>성공 시 <strong>Redirect</strong> <code>/posts/{id}</code></li>
 <li><strong>GET /posts/{id}</strong> — <code>get_post</code> → <code>DetailTemplate</code> 렌더</li>
 </ol>
-<p>JSON API는 3<del>4까지 동일하고, 5</del>6 대신 <strong>JSON PostResponse</strong>를 반환합니다.</p>
+<p>JSON API는 3~4까지 동일하고, 5~6 대신 <strong>JSON PostResponse</strong>를 반환합니다.</p>
 <h2 id="한-글-작성의-여정-rest">한 글 작성의 여정 (REST)<a class="heading-anchor" aria-label="이 제목으로 연결" href="#한-글-작성의-여정-rest"></a></h2>
 <pre class="astro-code astro-code-themes github-light github-dark" style="background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><span aria-label="코드 언어: Bash" class="code-language" data-pagefind-ignore="">Bash</span><code><span class="line"><span style="color:#6F42C1;--shiki-dark:#B392F0">POST</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> /api/posts</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> →</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> routes/post.rs</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> →</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> services</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> →</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> DB</span></span>
 <span class="line"><span style="color:#6F42C1;--shiki-dark:#B392F0">←</span><span style="color:#005CC5;--shiki-dark:#79B8FF"> 200</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> JSON</span><span style="color:#032F62;--shiki-dark:#9ECBFF"> PostResponse</span></span></code></pre>

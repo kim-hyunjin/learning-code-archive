@@ -175,7 +175,7 @@ Elasticsearch·OpenSearch나 Postgres 전문 검색처럼 <strong>키워드 검�
 <p>리랭커(cross-encoder)는 <strong>질문과 문서를 함께 넣어</strong> 관련도를 채점합니다. 훨씬 정확하지만 느립니다.
 그래서 조합이 정해져 있습니다.</p>
 <blockquote>
-<p><strong>넓게 뽑고(k=20<del>30), 정확하게 추린다(상위 3</del>5개만 LLM에 전달).</strong></p>
+<p><strong>넓게 뽑고(k=20~30), 정확하게 추린다(상위 3~5개만 LLM에 전달).</strong></p>
 </blockquote>
 <pre class="astro-code astro-code-themes github-light github-dark" style="background-color:#fff;--shiki-dark-bg:#24292e;color:#24292e;--shiki-dark:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="python"><span aria-label="코드 언어: Python" class="code-language" data-pagefind-ignore="">Python</span><code><span class="line"><span style="color:#D73A49;--shiki-dark:#F97583">from</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> langchain.retrievers </span><span style="color:#D73A49;--shiki-dark:#F97583">import</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> ContextualCompressionRetriever</span></span>
 <span class="line"><span style="color:#D73A49;--shiki-dark:#F97583">from</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> langchain.retrievers.document_compressors </span><span style="color:#D73A49;--shiki-dark:#F97583">import</span><span style="color:#24292E;--shiki-dark:#E1E4E8"> CrossEncoderReranker</span></span>
