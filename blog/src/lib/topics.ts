@@ -26,6 +26,7 @@ const TOPIC_LABELS: Record<string, string> = {
   language: 'Language',
   mobile: 'Mobile',
   security: 'Security',
+  'ai/llm-internals': 'LLM Internals',
   'ai/rag': 'RAG',
   'backend/backend-engineering': 'Backend Engineering',
   'backend/backend-engineering/asynchronous-processing': 'Asynchronous Processing',
