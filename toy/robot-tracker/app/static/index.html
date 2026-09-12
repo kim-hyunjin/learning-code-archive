@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Robot Position Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      margin: 0 0 4px;
+    }
+    #status {
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      color: #94a3b8;
+    }
+    #status.connected { color: #4ade80; }
+    #status.disconnected { color: #f87171; }
+    canvas {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      max-width: 100%;
+    }
+    #legend {
+      margin-top: 16px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+    .robot-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 999px;
+      padding: 4px 10px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Robot Position Tracker</h1>
+  <div id="status" class="disconnected">connecting...</div>
+  <canvas id="field" width="800" height="480"></canvas>
+  <div id="legend"></div>
+
+  <script>
+    const canvas = document.getElementById("field");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const legendEl = document.getElementById("legend");
+
+    const colors = ["#38bdf8", "#f472b6", "#fbbf24", "#a78bfa", "#34d399"];
+    const colorFor = (id, index) => colors[index % colors.length];
+
+    let field = { width: 100, height: 60 };
+
+    function toCanvasCoords(x, y) {
+      const px = (x / field.width) * canvas.width;
+      const py = (y / field.height) * canvas.height;
+      return [px, py];
+    }
+
+    function render(snapshot) {
+      field = snapshot.field;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // grid
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 1;
+      for (let gx = 0; gx <= field.width; gx += 10) {
+        const [px] = toCanvasCoords(gx, 0);
+        ctx.beginPath();
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, canvas.height);
+        ctx.stroke();
+      }
+      for (let gy = 0; gy <= field.height; gy += 10) {
+        const [, py] = toCanvasCoords(0, gy);
+        ctx.beginPath();
+        ctx.moveTo(0, py);
+        ctx.lineTo(canvas.width, py);
+        ctx.stroke();
+      }
+
+      legendEl.innerHTML = "";
+      snapshot.robots.forEach((robot, index) => {
+        const color = colorFor(robot.id, index);
+        const [px, py] = toCanvasCoords(robot.x, robot.y);
+
+        // heading arrow
+        const arrowLen = 18;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + Math.cos(robot.heading) * arrowLen, py + Math.sin(robot.heading) * arrowLen);
+        ctx.stroke();
+
+        // body
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(px, py, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#e2e8f0";
+        ctx.font = "11px sans-serif";
+        ctx.fillText(robot.id, px + 10, py - 10);
+
+        const chip = document.createElement("div");
+        chip.className = "robot-chip";
+        chip.innerHTML = `<span class="dot" style="background:${color}"></span>
+          ${robot.id} · (${robot.x.toFixed(1)}, ${robot.y.toFixed(1)}) · 배터리 ${robot.battery.toFixed(0)}%`;
+        legendEl.appendChild(chip);
+      });
+    }
+
+    function connect() {
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${protocol}://${location.host}/ws/robots`);
+
+      ws.onopen = () => {
+        statusEl.textContent = "connected";
+        statusEl.className = "connected";
+      };
+      ws.onclose = () => {
+        statusEl.textContent = "disconnected — retrying...";
+        statusEl.className = "disconnected";
+        setTimeout(connect, 1000);
+      };
+      ws.onerror = () => ws.close();
+      ws.onmessage = (event) => render(JSON.parse(event.data));
+    }
+
+    connect();
+  </script>
+</body>
+</html>
